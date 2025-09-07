@@ -3,42 +3,35 @@ package com.bankmanagement.model;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
-@Document(collection = "users")
-public class User {
+@Document(collection = "registration_requests")
+public class RegistrationRequest {
+
     @Id
     private String id;
     private String username;
     private String password;
-    private String role;   // "USER" or "ADMIN"
-    private double balance;
-    private boolean suspended;
-    private String accountType; // "CHECKING", "SAVINGS", "FIXED_DEPOSIT"
+    private String accountType;
+    private boolean approved;
 
-    public User() {}
+    public RegistrationRequest() {}
 
-    public User(String username, String password, String role, double balance, String accountType) {
+    public RegistrationRequest(String username, String password, String accountType) {
         this.username = username;
         this.password = password;
-        this.role = role;
-        this.balance = balance;
-        this.suspended = false;
         this.accountType = accountType;
+        this.approved = false;
     }
 
     // getters & setters
     public String getId() { return id; }
     public String getUsername() { return username; }
     public String getPassword() { return password; }
-    public String getRole() { return role; }
-    public double getBalance() { return balance; }
-    public boolean isSuspended() { return suspended; }
     public String getAccountType() { return accountType; }
+    public boolean isApproved() { return approved; }
 
     public void setId(String id) { this.id = id; }
     public void setUsername(String username) { this.username = username; }
     public void setPassword(String password) { this.password = password; }
-    public void setRole(String role) { this.role = role; }
-    public void setBalance(double balance) { this.balance = balance; }
-    public void setSuspended(boolean suspended) { this.suspended = suspended; }
     public void setAccountType(String accountType) { this.accountType = accountType; }
+    public void setApproved(boolean approved) { this.approved = approved; }
 }

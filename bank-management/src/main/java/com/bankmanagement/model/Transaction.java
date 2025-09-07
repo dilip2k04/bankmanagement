@@ -1,9 +1,9 @@
 package com.bankmanagement.model;
 
+import java.util.Date;
+
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
-
-import java.util.Date;
 
 @Document(collection = "transactions")
 public class Transaction {
@@ -23,7 +23,7 @@ public class Transaction {
         this.date = new Date();
     }
 
-    // getters and setters...
+    // getters & setters
     public String getId() { return id; }
     public String getFromUser() { return fromUser; }
     public String getToUser() { return toUser; }
