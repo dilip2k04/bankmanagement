@@ -13,26 +13,42 @@ export default function Dashboard() {
   const [amount, setAmount] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState("all");
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  const pageSize = 20;
   const navigate = useNavigate();
 
   useEffect(() => {
     if (!user) navigate("/");
     else fetchData();
-  }, []);
+  }, [user, navigate, page, searchQuery, filterType]);
 
   const fetchData = async () => {
     try {
+      setIsLoading(true);
       const bal = await api.get(`/balance/${user.username}`);
       setBalance(bal.data);
 
-      const tx = await api.get(`/transactions/${user.username}`);
-      setTransactions(tx.data);
+      const params = new URLSearchParams({
+        page,
+        size: pageSize,
+        search: searchQuery,
+        filter: filterType,
+      });
+      const tx = await api.get(`/transactions/${user.username}?${params.toString()}`);
+      setTransactions(tx.data.content || []);
+      setHasMore(tx.data.content.length === pageSize);
     } catch (err) {
       console.error("Error fetching data:", err);
+      alert(err.response?.data || "Failed to fetch data");
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleTransfer = async () => {
+  const handleTransfer = async (e) => {
+    e.preventDefault();
     if (!toUser || !amount || amount <= 0) {
       alert("Enter valid username and amount");
       return;
@@ -48,42 +64,27 @@ export default function Dashboard() {
       fetchData();
     } catch (err) {
       console.error(err);
-      alert("Transfer failed");
+      alert(err.response?.data || "Transfer failed");
     }
   };
 
-  const downloadCSV = () => {
-    const csvHeader = "From,To,Amount,Date\n";
-    const csvRows = filteredTransactions
-      .map(
-        (t) =>
-          `${t.fromUser},${t.toUser},${t.amount},${new Date(
-            t.date
-          ).toLocaleString()}`
-      )
-      .join("\n");
-    const csvContent = csvHeader + csvRows;
-
-    const blob = new Blob([csvContent], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "transactions.csv";
-    a.click();
-    URL.revokeObjectURL(url);
+  const downloadCSV = async () => {
+    try {
+      const response = await api.get(`/transactions/${user.username}/csv`, {
+        responseType: "blob",
+      });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `${user.username}_transactions.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      console.error("Error downloading CSV:", err);
+      alert(err.response?.data || "Failed to download CSV");
+    }
   };
-
-  // Search and Filter Logic
-  const filteredTransactions = transactions.filter((t) => {
-    const matchesSearch =
-      t.fromUser.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.toUser.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesFilter =
-      filterType === "all" ||
-      (filterType === "sent" && t.fromUser === user.username) ||
-      (filterType === "received" && t.toUser === user.username);
-    return matchesSearch && matchesFilter;
-  });
 
   return (
     <>
@@ -270,6 +271,41 @@ export default function Dashboard() {
             padding: 1.5rem;
           }
 
+          .loading {
+            text-align: center;
+            color: #4f46e5;
+            font-size: 1.125rem;
+            padding: 1.5rem;
+          }
+
+          .pagination {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            margin-top: 1.5rem;
+          }
+
+          .pagination-button {
+            padding: 0.5rem 1rem;
+            background: #4f46e5;
+            color: #ffffff;
+            border: none;
+            border-radius: 0.5rem;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+          }
+
+          .pagination-button:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+          }
+
+          .pagination-button:hover:not(:disabled) {
+            background: #4338ca;
+            transform: scale(1.05);
+          }
+
           @media (max-width: 640px) {
             .dashboard {
               padding: 1rem;
@@ -293,7 +329,8 @@ export default function Dashboard() {
             }
 
             .transfer-button,
-            .download-button {
+            .download-button,
+            .pagination-button {
               padding: 0.5rem 1rem;
               font-size: 0.875rem;
             }
@@ -309,13 +346,14 @@ export default function Dashboard() {
 
           <div className="transfer-section">
             <h3 className="section-title">Transfer Money</h3>
-            <div className="transfer-form">
+            <form className="transfer-form" onSubmit={handleTransfer}>
               <input
                 type="text"
                 placeholder="To Username"
                 className="transfer-input"
                 value={toUser}
                 onChange={(e) => setToUser(e.target.value)}
+                aria-label="Recipient username"
               />
               <input
                 type="number"
@@ -323,14 +361,15 @@ export default function Dashboard() {
                 className="transfer-input"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
+                aria-label="Transfer amount"
               />
-              <button onClick={handleTransfer} className="transfer-button">
+              <button type="submit" className="transfer-button" aria-label="Transfer money">
                 Transfer
               </button>
-            </div>
+            </form>
           </div>
 
-          <button onClick={downloadCSV} className="download-button">
+          <button onClick={downloadCSV} className="download-button" aria-label="Download transactions as CSV">
             Download Transactions CSV
           </button>
 
@@ -339,14 +378,22 @@ export default function Dashboard() {
               type="text"
               placeholder="Search by username..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setPage(0);
+              }}
               className="search-input"
+              aria-label="Search transactions by username"
             />
             <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
               <select
                 value={filterType}
-                onChange={(e) => setFilterType(e.target.value)}
+                onChange={(e) => {
+                  setFilterType(e.target.value);
+                  setPage(0);
+                }}
                 className="filter-select"
+                aria-label="Filter transactions"
               >
                 <option value="all">All Transactions</option>
                 <option value="sent">Sent</option>
@@ -357,8 +404,10 @@ export default function Dashboard() {
                   onClick={() => {
                     setSearchQuery("");
                     setFilterType("all");
+                    setPage(0);
                   }}
                   className="clear-button"
+                  aria-label="Clear search and filter"
                 >
                   Clear
                 </button>
@@ -367,17 +416,40 @@ export default function Dashboard() {
           </div>
 
           <h3 className="section-title">Transactions</h3>
-          {filteredTransactions.length === 0 ? (
+          {isLoading ? (
+            <p className="loading">Loading...</p>
+          ) : transactions.length === 0 ? (
             <p className="no-transactions">No transactions match the criteria.</p>
           ) : (
-            <ul className="transactions-list">
-              {filteredTransactions.map((t) => (
-                <li key={t.id} className="transaction-item">
-                  {t.fromUser} → {t.toUser} : ₹{t.amount.toFixed(2)} (
-                  {new Date(t.date).toLocaleString()})
-                </li>
-              ))}
-            </ul>
+            <>
+              <ul className="transactions-list">
+                {transactions.map((t) => (
+                  <li key={t.id} className="transaction-item">
+                    {t.fromUser} → {t.toUser} : ₹{t.amount.toFixed(2)} (
+                    {new Date(t.date).toLocaleString()})
+                  </li>
+                ))}
+              </ul>
+              <div className="pagination">
+                <button
+                  onClick={() => setPage((prev) => Math.max(prev - 1, 0))}
+                  className="pagination-button"
+                  disabled={page === 0 || isLoading}
+                  aria-label="Previous transactions page"
+                >
+                  Previous
+                </button>
+                <span>Page {page + 1}</span>
+                <button
+                  onClick={() => setPage((prev) => prev + 1)}
+                  className="pagination-button"
+                  disabled={!hasMore || isLoading}
+                  aria-label="Next transactions page"
+                >
+                  Next
+                </button>
+              </div>
+            </>
           )}
         </div>
       </div>

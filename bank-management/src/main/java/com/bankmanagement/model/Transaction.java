@@ -23,16 +23,15 @@ public class Transaction {
         this.date = new Date();
     }
 
-    // getters & setters
+    // Getters and setters
     public String getId() { return id; }
-    public String getFromUser() { return fromUser; }
-    public String getToUser() { return toUser; }
-    public double getAmount() { return amount; }
-    public Date getDate() { return date; }
-
     public void setId(String id) { this.id = id; }
+    public String getFromUser() { return fromUser; }
     public void setFromUser(String fromUser) { this.fromUser = fromUser; }
+    public String getToUser() { return toUser; }
     public void setToUser(String toUser) { this.toUser = toUser; }
+    public double getAmount() { return amount; }
     public void setAmount(double amount) { this.amount = amount; }
+    public Date getDate() { return date; }
     public void setDate(Date date) { this.date = date; }
 }

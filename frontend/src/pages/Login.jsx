@@ -1,35 +1,25 @@
 import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import Navbar from "../components/Navbar";
 import api from "../api";
 
-export default function Login() {
+export default function Login({ setUser }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState("");
   const navigate = useNavigate();
 
-  const handleLogin = async () => {
-    // Input validation
-    if (!username.trim() || !password.trim()) {
-      setError("Please enter both username and password");
-      return;
-    }
-
-    setError("");
-    setIsLoading(true);
-
+  const handleLogin = async (e) => {
+    e.preventDefault(); // Prevent form submission refresh
     try {
-      const res = await api.post("/login", null, {
+      const response = await api.post("/login", null, {
         params: { username, password },
       });
-      localStorage.setItem("user", JSON.stringify(res.data));
-      if (res.data.role === "ADMIN") navigate("/admin");
-      else navigate("/dashboard");
+      setUser(response.data);
+      localStorage.setItem("user", JSON.stringify(response.data));
+      navigate(response.data.role === "ADMIN" ? "/admin" : "/dashboard");
     } catch (err) {
-      setError("Invalid credentials or server error");
-    } finally {
-      setIsLoading(false);
+      console.error("Login error:", err);
+      alert(err.response?.data || "Login failed");
     }
   };
 
@@ -47,15 +37,15 @@ export default function Login() {
           }
 
           .login-container {
+            max-width: 400px;
+            width: 100%;
             background: #ffffff;
             border-radius: 0.75rem;
-            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
             padding: 2rem;
-            width: 100%;
-            max-width: 400px;
           }
 
-          .login-title {
+          .title {
             font-size: 1.75rem;
             font-weight: 700;
             color: #1f2937;
@@ -63,12 +53,13 @@ export default function Login() {
             text-align: center;
           }
 
-          .input-group {
-            margin-bottom: 1rem;
+          .login-form {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
           }
 
           .login-input {
-            width: 100%;
             padding: 0.75rem;
             border: 1px solid #d1d5db;
             border-radius: 0.5rem;
@@ -83,7 +74,6 @@ export default function Login() {
           }
 
           .login-button {
-            width: 100%;
             padding: 0.75rem;
             background: #2563eb;
             color: #ffffff;
@@ -100,99 +90,65 @@ export default function Login() {
             transform: scale(1.05);
           }
 
-          .login-button:disabled {
-            background: #9ca3af;
-            cursor: not-allowed;
-            transform: none;
-          }
-
-          .error-message {
-            color: #dc2626;
-            font-size: 0.875rem;
-            margin-bottom: 1rem;
-            text-align: center;
-          }
-
           .register-link {
-            margin-top: 1rem;
             text-align: center;
-            font-size: 1rem;
-            color: #4b5563;
-          }
-
-          .register-link a {
             color: #2563eb;
             text-decoration: none;
-            font-weight: 500;
-            transition: color 0.2s ease;
+            font-size: 1rem;
+            margin-top: 1rem;
+            display: block;
           }
 
-          .register-link a:hover {
-            color: #1d4ed8;
+          .register-link:hover {
             text-decoration: underline;
+            color: #1d4ed8;
           }
 
           @media (max-width: 640px) {
             .login-container {
               padding: 1.5rem;
-              max-width: 90%;
             }
 
-            .login-title {
+            .title {
               font-size: 1.5rem;
             }
 
-            .login-input {
-              padding: 0.5rem;
-              font-size: 0.875rem;
-            }
-
+            .login-input,
             .login-button {
-              padding: 0.5rem;
-              font-size: 0.875rem;
-            }
-
-            .register-link {
               font-size: 0.875rem;
             }
           }
         `}
       </style>
 
+      <Navbar user={null} setUser={setUser} />
       <div className="login-page">
         <div className="login-container">
-          <h2 className="login-title">Login</h2>
-          {error && <p className="error-message">{error}</p>}
-          <div className="input-group">
+          <h2 className="title">Login</h2>
+          <form className="login-form" onSubmit={handleLogin}>
             <input
               type="text"
               placeholder="Username"
               className="login-input"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              disabled={isLoading}
+              aria-label="Username"
             />
-          </div>
-          <div className="input-group">
             <input
               type="password"
               placeholder="Password"
               className="login-input"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              disabled={isLoading}
+              aria-label="Password"
             />
-          </div>
-          <button
-            onClick={handleLogin}
-            className="login-button"
-            disabled={isLoading}
-          >
-            {isLoading ? "Logging in..." : "Login"}
-          </button>
-          <p className="register-link">
-            Don’t have an account? <Link to="/register">Register</Link>
-          </p>
+            <button type="submit" className="login-button">
+              Login
+            </button>
+          </form>
+          <a href="/register" className="register-link">
+            Don't have an account? Register
+          </a>
         </div>
       </div>
     </>

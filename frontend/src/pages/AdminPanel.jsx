@@ -3,16 +3,20 @@ import { useNavigate, Link } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import api from "../api";
 
-export default function AdminPanel() {
-  const [user, setUser] = useState(
-    JSON.parse(localStorage.getItem("user")) || null
-  );
+export default function AdminPanel({ user, setUser }) {
   const [users, setUsers] = useState([]);
   const [requests, setRequests] = useState([]);
   const [activeTab, setActiveTab] = useState("requests");
   const [searchQuery, setSearchQuery] = useState("");
   const [requestFilter, setRequestFilter] = useState("all");
   const [userFilter, setUserFilter] = useState("all");
+  const [requestsPage, setRequestsPage] = useState(0);
+  const [usersPage, setUsersPage] = useState(0);
+  const [requestsHasMore, setRequestsHasMore] = useState(true);
+  const [usersHasMore, setUsersHasMore] = useState(true);
+  const [isLoadingUsers, setIsLoadingUsers] = useState(false);
+  const [isLoadingRequests, setIsLoadingRequests] = useState(false);
+  const pageSize = 20;
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -21,18 +25,28 @@ export default function AdminPanel() {
       fetchUsers();
       fetchRequests();
     }
-  }, []);
+  }, [user, navigate, usersPage, requestsPage, searchQuery, userFilter, requestFilter]);
 
   // ---------------- Users ----------------
   const fetchUsers = async () => {
     try {
-      const res = await api.get("/admin/users");
-      setUsers(res.data || []);
+        setIsLoadingUsers(true);
+        const params = new URLSearchParams({
+            page: usersPage,
+            size: pageSize,
+            search: searchQuery,
+            filter: userFilter,
+        });
+        const res = await api.get(`/admin/users?${params.toString()}`);
+        setUsers(res.data.content || []);
+        setUsersHasMore(res.data.content.length === pageSize);
     } catch (err) {
-      console.error("Error fetching users:", err);
-      alert("Failed to fetch users");
+        console.error("Error fetching users:", err);
+        alert(err.response?.data || "Failed to fetch users");
+    } finally {
+        setIsLoadingUsers(false);
     }
-  };
+};
 
   const toggleSuspendUser = async (username, suspended) => {
     try {
@@ -44,7 +58,7 @@ export default function AdminPanel() {
       fetchUsers();
     } catch (err) {
       console.error("Error toggling user suspension:", err);
-      alert("Failed to update user status");
+      alert(err.response?.data || "Failed to update user status");
     }
   };
 
@@ -55,7 +69,7 @@ export default function AdminPanel() {
         fetchUsers();
       } catch (err) {
         console.error("Error deleting user:", err);
-        alert("Failed to delete user");
+        alert(err.response?.data || "Failed to delete user");
       }
     }
   };
@@ -63,13 +77,23 @@ export default function AdminPanel() {
   // ---------------- Registration Requests ----------------
   const fetchRequests = async () => {
     try {
-      const res = await api.get("/admin/requests");
-      setRequests(res.data || []);
+        setIsLoadingRequests(true);
+        const params = new URLSearchParams({
+            page: requestsPage,
+            size: pageSize,
+            search: searchQuery,
+            filter: requestFilter,
+        });
+        const res = await api.get(`/admin/requests?${params.toString()}`);
+        setRequests(res.data.content || []);
+        setRequestsHasMore(res.data.content.length === pageSize);
     } catch (err) {
-      console.error("Error fetching requests:", err);
-      alert("Failed to fetch requests");
+        console.error("Error fetching requests:", err);
+        alert(err.response?.data || "Failed to fetch requests");
+    } finally {
+        setIsLoadingRequests(false);
     }
-  };
+};
 
   const approveRequest = async (id) => {
     try {
@@ -78,7 +102,7 @@ export default function AdminPanel() {
       fetchUsers();
     } catch (err) {
       console.error("Error approving request:", err);
-      alert("Failed to approve request");
+      alert(err.response?.data || "Failed to approve request");
     }
   };
 
@@ -88,31 +112,9 @@ export default function AdminPanel() {
       fetchRequests();
     } catch (err) {
       console.error("Error rejecting request:", err);
-      alert("Failed to reject request");
+      alert(err.response?.data || "Failed to reject request");
     }
   };
-
-  // ---------------- Search and Filter Logic ----------------
-  const filteredRequests = requests.filter((r) => {
-    const matchesSearch = r.username
-      ? r.username.toLowerCase().includes(searchQuery.toLowerCase())
-      : false;
-    const matchesFilter =
-      requestFilter === "all" || r.accountType === requestFilter;
-    return matchesSearch && matchesFilter;
-  });
-
-  const filteredUsers = users.filter((u) => {
-    const matchesSearch = u.username
-      ? u.username.toLowerCase().includes(searchQuery.toLowerCase())
-      : false;
-    const matchesFilter =
-      userFilter === "all" ||
-      (userFilter === "active" && !u.suspended) ||
-      (userFilter === "suspended" && u.suspended) ||
-      u.role === userFilter;
-    return matchesSearch && matchesFilter;
-  });
 
   return (
     <>
@@ -253,6 +255,13 @@ export default function AdminPanel() {
             padding: 1.5rem;
           }
 
+          .loading {
+            text-align: center;
+            color: #4f46e5;
+            font-size: 1.125rem;
+            padding: 1.5rem;
+          }
+
           .table-container {
             overflow-x: auto;
           }
@@ -365,6 +374,34 @@ export default function AdminPanel() {
             transform: scale(1.05);
           }
 
+          .pagination {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            margin-top: 1.5rem;
+          }
+
+          .pagination-button {
+            padding: 0.5rem 1rem;
+            background: #4f46e5;
+            color: #ffffff;
+            border: none;
+            border-radius: 0.5rem;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+          }
+
+          .pagination-button:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+          }
+
+          .pagination-button:hover:not(:disabled) {
+            background: #4338ca;
+            transform: scale(1.05);
+          }
+
           @media (max-width: 640px) {
             .admin-panel {
               padding: 0.5rem;
@@ -388,6 +425,11 @@ export default function AdminPanel() {
               padding: 0.75rem;
               font-size: 0.875rem;
             }
+
+            .pagination-button {
+              padding: 0.5rem;
+              font-size: 0.875rem;
+            }
           }
         `}
       </style>
@@ -405,8 +447,10 @@ export default function AdminPanel() {
                   setActiveTab("requests");
                   setSearchQuery("");
                   setRequestFilter("all");
+                  setRequestsPage(0);
                 }}
                 className={`tab-button ${activeTab === "requests" ? "active" : ""}`}
+                aria-label="View pending requests"
               >
                 Pending Requests
               </button>
@@ -415,8 +459,10 @@ export default function AdminPanel() {
                   setActiveTab("users");
                   setSearchQuery("");
                   setUserFilter("all");
+                  setUsersPage(0);
                 }}
                 className={`tab-button ${activeTab === "users" ? "active" : ""}`}
+                aria-label="Manage users"
               >
                 Manage Users
               </button>
@@ -430,26 +476,40 @@ export default function AdminPanel() {
                 type="text"
                 placeholder="Search by username..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setUsersPage(0);
+                  setRequestsPage(0);
+                }}
                 className="search-input"
+                aria-label="Search by username"
               />
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
               {activeTab === "requests" ? (
                 <select
                   value={requestFilter}
-                  onChange={(e) => setRequestFilter(e.target.value)}
+                  onChange={(e) => {
+                    setRequestFilter(e.target.value);
+                    setRequestsPage(0);
+                  }}
                   className="filter-select"
+                  aria-label="Filter requests by account type"
                 >
                   <option value="all">All Account Types</option>
                   <option value="SAVINGS">Savings</option>
                   <option value="CHECKING">Checking</option>
+                  <option value="FIXED_DEPOSIT">Fixed Deposit</option>
                 </select>
               ) : (
                 <select
                   value={userFilter}
-                  onChange={(e) => setUserFilter(e.target.value)}
+                  onChange={(e) => {
+                    setUserFilter(e.target.value);
+                    setUsersPage(0);
+                  }}
                   className="filter-select"
+                  aria-label="Filter users"
                 >
                   <option value="all">All Users</option>
                   <option value="USER">Users</option>
@@ -464,8 +524,11 @@ export default function AdminPanel() {
                     setSearchQuery("");
                     setRequestFilter("all");
                     setUserFilter("all");
+                    setUsersPage(0);
+                    setRequestsPage(0);
                   }}
                   className="clear-button"
+                  aria-label="Clear filters"
                 >
                   Clear
                 </button>
@@ -478,7 +541,9 @@ export default function AdminPanel() {
             {activeTab === "requests" && (
               <div>
                 <h3 className="section-title">Pending Registration Requests</h3>
-                {filteredRequests.length === 0 ? (
+                {isLoadingRequests ? (
+                  <p className="loading">Loading...</p>
+                ) : requests.length === 0 ? (
                   <p className="no-data">No pending requests match the criteria.</p>
                 ) : (
                   <div className="table-container">
@@ -492,23 +557,23 @@ export default function AdminPanel() {
                         </tr>
                       </thead>
                       <tbody>
-                        {filteredRequests.map((r, idx) => (
+                        {requests.map((r) => (
                           <tr key={r.id}>
                             <td className="font-medium">{r.username || "N/A"}</td>
                             <td>{r.accountType || "N/A"}</td>
-                            <td>
-                              ₹{(r.initialBalance ?? 0).toLocaleString()}
-                            </td>
+                            <td>₹{(r.initialBalance ?? 0).toLocaleString()}</td>
                             <td className="action-buttons">
                               <button
                                 onClick={() => approveRequest(r.id)}
                                 className="approve-button"
+                                aria-label={`Approve request for ${r.username}`}
                               >
                                 Approve
                               </button>
                               <button
                                 onClick={() => rejectRequest(r.id)}
                                 className="reject-button"
+                                aria-label={`Reject request for ${r.username}`}
                               >
                                 Reject
                               </button>
@@ -519,13 +584,34 @@ export default function AdminPanel() {
                     </table>
                   </div>
                 )}
+                <div className="pagination">
+                  <button
+                    onClick={() => setRequestsPage((prev) => Math.max(prev - 1, 0))}
+                    className="pagination-button"
+                    disabled={requestsPage === 0 || isLoadingRequests}
+                    aria-label="Previous requests page"
+                  >
+                    Previous
+                  </button>
+                  <span>Page {requestsPage + 1}</span>
+                  <button
+                    onClick={() => setRequestsPage((prev) => prev + 1)}
+                    className="pagination-button"
+                    disabled={!requestsHasMore || isLoadingRequests}
+                    aria-label="Next requests page"
+                  >
+                    Next
+                  </button>
+                </div>
               </div>
             )}
 
             {activeTab === "users" && (
               <div>
                 <h3 className="section-title">Manage Users</h3>
-                {filteredUsers.length === 0 ? (
+                {isLoadingUsers ? (
+                  <p className="loading">Loading...</p>
+                ) : users.length === 0 ? (
                   <p className="no-data">No users match the criteria.</p>
                 ) : (
                   <div className="table-container">
@@ -540,12 +626,13 @@ export default function AdminPanel() {
                         </tr>
                       </thead>
                       <tbody>
-                        {filteredUsers.map((u, idx) => (
+                        {users.map((u) => (
                           <tr key={u.id}>
                             <td className="font-medium">
                               <Link
                                 to={`/admin/user/${u.username}/transactions`}
                                 className="username-link"
+                                aria-label={`View transactions for ${u.username}`}
                               >
                                 {u.username || "N/A"}
                               </Link>
@@ -565,12 +652,18 @@ export default function AdminPanel() {
                                 className={
                                   u.suspended ? "unsuspend-button" : "suspend-button"
                                 }
+                                aria-label={
+                                  u.suspended
+                                    ? `Unsuspend ${u.username}`
+                                    : `Suspend ${u.username}`
+                                }
                               >
                                 {u.suspended ? "Unsuspend" : "Suspend"}
                               </button>
                               <button
                                 onClick={() => deleteUser(u.username)}
                                 className="delete-button"
+                                aria-label={`Delete ${u.username}`}
                               >
                                 Delete
                               </button>
@@ -581,6 +674,25 @@ export default function AdminPanel() {
                     </table>
                   </div>
                 )}
+                <div className="pagination">
+                  <button
+                    onClick={() => setUsersPage((prev) => Math.max(prev - 1, 0))}
+                    className="pagination-button"
+                    disabled={usersPage === 0 || isLoadingUsers}
+                    aria-label="Previous users page"
+                  >
+                    Previous
+                  </button>
+                  <span>Page {usersPage + 1}</span>
+                  <button
+                    onClick={() => setUsersPage((prev) => prev + 1)}
+                    className="pagination-button"
+                    disabled={!usersHasMore || isLoadingUsers}
+                    aria-label="Next users page"
+                  >
+                    Next
+                  </button>
+                </div>
               </div>
             )}
           </div>
